@@ -1,12 +1,14 @@
 """
 Converts PDF documents to bitmaps and generates a C header file
-that can be rendered on Waveshare E-paper displays.
+that can be used to render PDFs on Waveshare E-paper displays. This script uses
+Poppler and ImageMagick to perform the conversions.
+
 Usage: python -m pdftool [document] [first page] [last page] [crop page]
        document: path to PDF document
        first page: start conversion at this page
        last page: stop conversion at this page (inclusive)
-       crop page: an optional page number to use when determining area to crop. If not specified
-                  each page is croppped to minimize white borders.
+       crop page: an optional page number to use when determining area to crop.
+                  If not specified, each page is croppped to minimize white borders.
 """
 
 import os
