@@ -7,11 +7,24 @@ pdf = sys.argv[1]
 p1 = int(sys.argv[2])
 pn = int(sys.argv[3])
 
-root = pdf.replace("." + pdf.split('.')[-1], "")
+# if 4th argument is supplied, crop based on that page. Otherwise maximize per page.
+p0 = 0
+crop_area = None
+if len(sys.argv) == 5:
+    p0 = int(sys.argv[4])
+    p0_name = "test.jpg"
+    subprocess.run(["pdftoppm", "-jpeg", "-r", "300", "-thinlinemode", "solid", "-f", str(p0), "-singlefile", pdf, "test"])
+    rv = subprocess.run(
+        ["magick", p0_name, "-trim", "-format", "%[fx:w]x%[fx:h]+%[fx:page.x]+%[fx:page.y]", "info:"],
+        capture_output=True,
+        text=True
+    )
+    crop_area = rv.stdout
+    os.remove(p0_name)
+
+root = "doc"
 jpg = root + ".jpg"
 h = root + ".h"
-mon = "mon.jpg"
-res = "res.jpg"
 txt = root + ".txt"
 macro = root.upper() + "_H"
 data_len = pn - p1 + 1
@@ -24,10 +37,14 @@ with open(h, "w") as f:
     for p in range(p1, pn + 1):
         print("Processing page {}/{}...".format(p, pn))
         subprocess.run(["pdftoppm", "-jpeg", "-r", "300", "-thinlinemode", "solid", "-f", str(p), "-singlefile", pdf, root])
-        subprocess.run(["mogrify", "-trim", "-rotate", "-90", jpg])
-        subprocess.run(["convert", jpg, "-monochrome", mon]) 
-        subprocess.run(["convert", mon, "-resize", "800x480!", res]) 
-        subprocess.run(["convert", res, "-depth", "1", "-format", "'txt'", txt])
+        if crop_area is not None:
+            subprocess.run(["magick", jpg, "-crop", crop_area, jpg])
+        else:
+            subprocess.run(["mogrify", "-trim", jpg]) 
+        subprocess.run(["convert", jpg, "-resize", "480x800!", jpg]) 
+        subprocess.run(["convert", jpg, "-threshold", "80%", jpg]) 
+        subprocess.run(["mogrify", "-rotate", "-90", jpg])
+        subprocess.run(["convert", jpg, "-depth", "1", "-format", "'txt'", txt])
 
         f.write("\t{\n\t\t")
         total = 0
@@ -65,6 +82,4 @@ elif size < pow(1024,4):
     print("Done! Wrote {:0.1f}GB to {}".format(round(size / (pow(1024, 3)), 2), h))
 
 os.remove(txt)
-os.remove(res)
-os.remove(mon)
 os.remove(jpg)

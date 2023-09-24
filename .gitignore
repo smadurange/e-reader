@@ -1,3 +1,5 @@
 sdkconfig*
 build/
 **/__pycache__/
+**/*.pdf
+**/*.jpg

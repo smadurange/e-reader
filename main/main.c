@@ -7,7 +7,7 @@
 
 #include "epd.h"
 #include "util.h"
-#include "pocorgtfo21.h"
+#include "doc.h"
 
 #define IO_PG_PREV  GPIO_NUM_21
 #define IO_PG_NEXT  GPIO_NUM_22
@@ -24,14 +24,31 @@ static void gpio_task(void* arg)
 
 	for(;;) {
 		if(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
-			if (io_num == IO_PG_NEXT && page < data_len - 1)
-				epd_draw(data[++page]);
-			else if (io_num == IO_PG_PREV && page > 0)
-				epd_draw(data[--page]);
-			else
+			if (io_num == IO_PG_NEXT) {
+				if (page < data_len - 1) {
+					epd_draw(data[++page]);
+					gpio_intr_enable(IO_PG_NEXT);
+					gpio_intr_enable(IO_PG_PREV);
+				} else {
+					epd_clear();
+					epd_sleep();
+				}
+			}
+			else if (io_num == IO_PG_PREV) {
+				if (page > 0) {
+					epd_draw(data[--page]);
+					gpio_intr_enable(IO_PG_NEXT);
+					gpio_intr_enable(IO_PG_PREV);
+				} else {
+					epd_clear();
+					epd_sleep();
+				}
+			}
+			else {
 				delay_ms(500);
-			gpio_intr_enable(IO_PG_NEXT);
-			gpio_intr_enable(IO_PG_PREV);
+				gpio_intr_enable(IO_PG_NEXT);
+				gpio_intr_enable(IO_PG_PREV);
+			}
 		}
 	}
 }
