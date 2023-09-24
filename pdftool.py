@@ -1,3 +1,14 @@
+"""
+Converts PDF documents to bitmaps and generates a C header file
+that can be rendered on Waveshare E-paper displays.
+Usage: python -m pdftool [document] [first page] [last page] [crop page]
+       document: path to PDF document
+       first page: start conversion at this page
+       last page: stop conversion at this page (inclusive)
+       crop page: an optional page number to use when determining area to crop. If not specified
+                  each page is croppped to minimize white borders.
+"""
+
 import os
 import re
 import sys
