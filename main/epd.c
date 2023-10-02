@@ -21,7 +21,7 @@
 #define EPD_MOSI_PIN   GPIO_NUM_23
 #define EPD_BUSY_PIN   GPIO_NUM_4
 
-static const char* TAG = "EPD";
+static const char* TAG = "epd";
 
 static spi_device_handle_t spi = NULL;
 
@@ -93,6 +93,7 @@ static void send_cmd(uint8_t cmd)
 	t.length = 8;
 	t.tx_buffer = &cmd;
 	t.user = (void*)0; 
+
 	ESP_ERROR_CHECK(spi_device_polling_transmit(spi, &t));
 }
 
@@ -104,6 +105,7 @@ static void send_data(uint8_t data)
 	t.length = 8;
 	t.tx_buffer = &data;
 	t.user = (void*)1; 
+
 	ESP_ERROR_CHECK(spi_device_polling_transmit(spi, &t));
 }
 
@@ -112,10 +114,12 @@ static inline void wait_until_idle(void)
 	int busy;
 
 	ESP_LOGI(TAG, "busy...");
+
 	do {
 		send_cmd(0x71);
 		busy = gpio_get_level(EPD_BUSY_PIN);
 	} while(busy == 0);
+
 	ESP_LOGI(TAG, "ready");
 	delay_ms(20);
 }
@@ -124,8 +128,10 @@ static inline void reset(void)
 {
 	ESP_ERROR_CHECK(gpio_set_level(EPD_RST_PIN, 1));
 	delay_ms(200);
+
 	ESP_ERROR_CHECK(gpio_set_level(EPD_RST_PIN, 0));
 	delay_ms(2);
+
 	ESP_ERROR_CHECK(gpio_set_level(EPD_RST_PIN, 1));
 	delay_ms(200);
 }
@@ -142,7 +148,9 @@ static inline void config_lut(uint8_t cmd, const uint8_t *lut)
 static inline void gpio_init(void)
 {
 	gpio_config_t io_cfg = {
-		.pin_bit_mask = ((1ULL << EPD_DC_PIN) | (1ULL << EPD_RST_PIN) | (1ULL << EPD_BUSY_PIN)),
+		.pin_bit_mask = ((1ULL << EPD_DC_PIN) |
+		                (1ULL << EPD_RST_PIN) |
+		                (1ULL << EPD_BUSY_PIN)),
 		.pull_up_en = true
 	};
 
@@ -150,6 +158,7 @@ static inline void gpio_init(void)
 	ESP_ERROR_CHECK(gpio_set_direction(EPD_DC_PIN, GPIO_MODE_OUTPUT));
 	ESP_ERROR_CHECK(gpio_set_direction(EPD_RST_PIN, GPIO_MODE_OUTPUT));
 	ESP_ERROR_CHECK(gpio_set_direction(EPD_BUSY_PIN, GPIO_MODE_INPUT));
+
 	delay_ms(500);
 }
 
@@ -163,7 +172,10 @@ static void spi_init(void)
 		.quadhd_io_num = -1,
 		.max_transfer_sz = 8
 	};
-	ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST, &bus_cfg, SPI_DMA_CH_AUTO));
+
+	ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST,
+	                                   &bus_cfg,
+	                                   SPI_DMA_CH_AUTO));
 
 	spi_device_interface_config_t dev_cfg = {
 		.clock_speed_hz = 10 * 1000 * 1000,
@@ -172,6 +184,7 @@ static void spi_init(void)
 		.queue_size = 1,
 		.pre_cb = spi_pre_cb_handler
 	};
+
 	ESP_ERROR_CHECK(spi_bus_add_device(SPI2_HOST, &dev_cfg, &spi));
 }
 
@@ -242,6 +255,7 @@ static inline void refresh()
 {
 	send_cmd(0x12);
 	delay_ms(100);
+
 	wait_until_idle();
 }
 
@@ -249,7 +263,9 @@ void epd_clear(void)
 {
 	uint16_t i, width, height;
 
-	width = (EPD_SCREEN_WIDTH % 8 == 0) ? (EPD_SCREEN_WIDTH / 8 ) : (EPD_SCREEN_WIDTH / 8 + 1);
+	width = (EPD_SCREEN_WIDTH % 8 == 0) ?
+	        (EPD_SCREEN_WIDTH / 8 ) :
+	        (EPD_SCREEN_WIDTH / 8 + 1);
 	height = EPD_SCREEN_HEIGHT;
 
 	send_cmd(0x10);
@@ -267,7 +283,9 @@ void epd_draw(const uint8_t pb[48000])
 {
 	uint32_t i, j, width, height;
 
-	width = (EPD_SCREEN_WIDTH % 8 == 0) ? (EPD_SCREEN_WIDTH / 8 ) : (EPD_SCREEN_WIDTH / 8 + 1);
+	width = (EPD_SCREEN_WIDTH % 8 == 0) ?
+	        (EPD_SCREEN_WIDTH / 8 ) :
+	        (EPD_SCREEN_WIDTH / 8 + 1);
 	height = EPD_SCREEN_HEIGHT;
 	
 	send_cmd(0x13);
@@ -282,7 +300,9 @@ void epd_draw(const uint8_t pb[48000])
 void epd_sleep(void)
 {
 	send_cmd(0x02);
+
 	wait_until_idle();
+
 	send_cmd(0x07);
 	send_data(0xA5);
 }

@@ -3,4 +3,4 @@
 
 void delay_ms(unsigned int t);
 
-#endif
+#endif /* EPD_UTIL_H */

@@ -6,4 +6,4 @@ void epd_clear(void);
 void epd_draw(const uint8_t pb[48000]);
 void epd_sleep(void);
 
-#endif
+#endif /* EPD_H */
