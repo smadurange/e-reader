@@ -115,7 +115,7 @@ static void gpio_task(void* arg)
 		if(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
 			if (io_num == IO_PAGE_NEXT) {
 				page_num++;
-				//epd_draw(pages[page_num % PAGE_LEN]);
+				epd_draw(pages[page_num % PAGE_LEN]);
 				if(!http_get_page(page_num + 2,
 				                  (char *) pages[(page_num + 1) % PAGE_LEN])) {
 					page_num--;
@@ -123,7 +123,7 @@ static void gpio_task(void* arg)
 			}
 			else if (io_num == IO_PAGE_PREV && page_num > 0) {
 				page_num--;
-				//epd_draw(pages[page_num % PAGE_LEN]);
+				epd_draw(pages[page_num % PAGE_LEN]);
 				if(!http_get_page(page_num + 1,
 					                (char *) pages[(page_num - 1) % PAGE_LEN])) {
 					page_num++;
@@ -244,9 +244,9 @@ void app_main(void)
 
 	wifi_connect();
 
-	//epd_init();
-	//epd_clear();
-	//delay_ms(500);
+	epd_init();
+	epd_clear();
+	delay_ms(500);
 
 	pages[0] = malloc(sizeof(uint8_t) * PAGE_SIZE);
 	pages[1] = malloc(sizeof(uint8_t) * PAGE_SIZE);
@@ -255,7 +255,7 @@ void app_main(void)
 	if (pages[0] && pages[1] && pages[2]) {
 		if (http_get_page(page_num + 1,
 		                  (char *) pages[page_num % PAGE_LEN])) {
-			//epd_draw(pages[page_num % PAGE_LEN]);
+			epd_draw(pages[page_num % PAGE_LEN]);
 			if (!http_get_page(page_num + 2,
 			                   (char *) pages[(page_num + 1) % PAGE_LEN])) {
 				page_num = -1;
