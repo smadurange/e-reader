@@ -28,15 +28,15 @@ for o, a in opts:
             os.makedirs(output_path)
 
 root = output_path + "/doc"
-print("Converting PDF to JPEGs...")
-subprocess.run(["pdftoppm", "-jpeg", "-progress", "-r", dpi, "-thinlinemode", "solid", doc, root])
-print("Finished converting PDF to JPEGs.")
+print("Converting PDF to images...")
+subprocess.run(["pdftoppm", "-png", "-progress", "-r", dpi, "-thinlinemode", "solid", doc, root])
+print("Finished converting PDF to images.")
 
-paths = list(Path(output_path).glob('*.jpg'))
+paths = sorted(list(Path(output_path).glob('*.png')))
 
 print("Determining page size...")
 w = h = 0
-dx = dy = sys.maxsize
+
 for p in paths:
     rv = subprocess.run(
             ["magick", p, "-trim", "-format", "%[fx:w] %[fx:h] %[fx:page.x] %[fx:page.y]", "info:"],
@@ -44,49 +44,44 @@ for p in paths:
             text=True
          )
     area = [int(x) for x in rv.stdout.split()]
-    if w < area[0]:
+    if w * h < area[0] * area[1]:
         w = area[0]
-    if h < area[1]:
         h = area[1]
-    if dx > area[2]:
         dx = area[2]
-    if dy > area[3]:
         dy = area[3]
 
 crop = "{}x{}+{}+{}".format(w, h, dx, dy)
-print("Crop area: {}".format(crop))
+print("Crop: {}".format(crop))
 
-for i, p in enumerate(paths):
-    print("Processing page {}/{}...".format(i+1, len(paths)))
-    jpg = str(p)
-    txt = jpg.replace(".jpg", ".txt")
-    ebm = jpg.replace(".jpg", ".ebm")
+ebm = "a.ebm"
 
-    subprocess.run(["magick", jpg, "-crop", crop, jpg])
-    subprocess.run(["convert", jpg, "-resize", screen_size, jpg]) 
-    subprocess.run(["convert", jpg, "-threshold", "80%", jpg]) 
-    subprocess.run(["mogrify", "-rotate", "-90", jpg])
-    subprocess.run(["convert", jpg, "-depth", "1", "-format", "'txt'", txt])
-
-    with open(txt, "r") as src, open(ebm, "wb") as dst:
-        total = 0
-        n = 7
-        x = 0xFF
-        count = 0
-        src.readline()
-        for line in src:
-            px = re.search("\([^\)]+\)", line).group()
-            if px == "(0)":                        
-                x &= ~(1 << n)
-            n -= 1
-            if n < 0:
-                dst.write(x.to_bytes(1))
-                count += 1
-                total += 1
-                if count >= 12:
-                    count = 0
-                n = 7
-                x = 0xFF
-    os.remove(txt)
-    os.remove(jpg)
+with open(ebm, "ab") as dst:
+    for i, p in enumerate(paths):
+        print("Processing page {}/{}...".format(i+1, len(paths)))
+        png = str(p)
+        txt = re.sub("-0+", "-", png, count=1).replace(".png", ".txt")
+    
+        subprocess.run(["magick", png, "-crop", crop, png])
+        subprocess.run(["convert", png, "-resize", screen_size, png]) 
+        subprocess.run(["convert", png, "-threshold", "80%", png]) 
+        subprocess.run(["mogrify", "-rotate", "-90", png])
+        subprocess.run(["convert", png, "-depth", "1", "-format", "'txt'", txt])
+    
+        with open(txt, "r") as src:
+            total = 0
+            n = 7
+            x = 0
+            src.readline()
+            for line in src:
+                px = re.search("\([^\)]+\)", line).group()
+                if px == "(0)":                        
+                    x |= (1 << n)
+                n -= 1
+                if n < 0:
+                    dst.write(x.to_bytes(1))
+                    total += 1
+                    n = 7
+                    x = 0
+        os.remove(txt)
+        os.remove(png)
 

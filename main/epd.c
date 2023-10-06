@@ -6,16 +6,16 @@
 
 #include <driver/spi_master.h>
 #include <driver/gpio.h>
+
 #include <esp_log.h>
 
 #include "epd.h"
-#include "util.h"
 
-#define EPD_SCREEN_WIDTH    800
-#define EPD_SCREEN_HEIGHT   480
+#define EPD_WIDTH    800
+#define EPD_HEIGHT   480
 
 #define EPD_CS_PIN     GPIO_NUM_5
-#define EPD_DC_PIN     GPIO_NUM_15
+#define EPD_DC_PIN     GPIO_NUM_16
 #define EPD_RST_PIN    GPIO_NUM_2
 #define EPD_CLK_PIN    GPIO_NUM_18
 #define EPD_MOSI_PIN   GPIO_NUM_23
@@ -25,11 +25,11 @@ static const char* TAG = "epd";
 
 static spi_device_handle_t spi = NULL;
 
-static uint8_t VOLTAGE_FRAME[] = {
+static const uint8_t VOLTAGE_FRAME[] = {
 	0x6, 0x3F, 0x3F, 0x11, 0x24, 0x7, 0x17,
 };
 
-static uint8_t LUT_VCOM[] = {	
+static const uint8_t LUT_VCOM[] = {	
 	0x0,	0xF,	0xF,	0x0,	0x0,	0x1,	
 	0x0,	0xF,	0x1,	0xF,	0x1,	0x2,	
 	0x0,	0xF,	0xF,	0x0,	0x0,	0x1,	
@@ -39,7 +39,7 @@ static uint8_t LUT_VCOM[] = {
 	0x0,	0x0,	0x0,	0x0,	0x0,	0x0,	
 };						
 
-static uint8_t LUT_WW[] = {	
+static const uint8_t LUT_WW[] = {	
 	0x10,	0xF,	0xF,	0x0,	0x0,	0x1,	
 	0x84,	0xF,	0x1,	0xF,	0x1,	0x2,	
 	0x20,	0xF,	0xF,	0x0,	0x0,	0x1,	
@@ -49,7 +49,7 @@ static uint8_t LUT_WW[] = {
 	0x0,	0x0,	0x0,	0x0,	0x0,	0x0,	
 };
 
-static uint8_t LUT_BW[] = {	
+static const uint8_t LUT_BW[] = {	
 	0x10,	0xF,	0xF,	0x0,	0x0,	0x1,	
 	0x84,	0xF,	0x1,	0xF,	0x1,	0x2,	
 	0x20,	0xF,	0xF,	0x0,	0x0,	0x1,	
@@ -59,7 +59,7 @@ static uint8_t LUT_BW[] = {
 	0x0,	0x0,	0x0,	0x0,	0x0,	0x0,	
 };
 
-static uint8_t LUT_WB[] = {	
+static const uint8_t LUT_WB[] = {	
 	0x80,	0xF,	0xF,	0x0,	0x0,	0x1,	
 	0x84,	0xF,	0x1,	0xF,	0x1,	0x2,	
 	0x40,	0xF,	0xF,	0x0,	0x0,	0x1,	
@@ -69,7 +69,7 @@ static uint8_t LUT_WB[] = {
 	0x0,	0x0,	0x0,	0x0,	0x0,	0x0,	
 };
 
-static uint8_t LUT_BB[] = {	
+static const uint8_t LUT_BB[] = {	
 	0x80,	0xF,	0xF,	0x0,	0x0,	0x1,	
 	0x84,	0xF,	0x1,	0xF,	0x1,	0x2,	
 	0x40,	0xF,	0xF,	0x0,	0x0,	0x1,	
@@ -91,10 +91,11 @@ static void send_cmd(uint8_t cmd)
 
 	memset(&t, 0, sizeof(t));	
 	t.length = 8;
-	t.tx_buffer = &cmd;
+	t.tx_data[0] = cmd;
 	t.user = (void*)0; 
+	t.flags = SPI_TRANS_USE_TXDATA;
 
-	ESP_ERROR_CHECK(spi_device_polling_transmit(spi, &t));
+	spi_device_polling_transmit(spi, &t);
 }
 
 static void send_data(uint8_t data)
@@ -103,10 +104,11 @@ static void send_data(uint8_t data)
 
 	memset(&t, 0, sizeof(t));	
 	t.length = 8;
-	t.tx_buffer = &data;
+	t.tx_data[0] = data;
 	t.user = (void*)1; 
+	t.flags = SPI_TRANS_USE_TXDATA;
 
-	ESP_ERROR_CHECK(spi_device_polling_transmit(spi, &t));
+	spi_device_polling_transmit(spi, &t);
 }
 
 static inline void wait_until_idle(void)
@@ -118,30 +120,29 @@ static inline void wait_until_idle(void)
 	do {
 		send_cmd(0x71);
 		busy = gpio_get_level(EPD_BUSY_PIN);
-	} while(busy == 0);
+	} while (busy == 0);
 
 	ESP_LOGI(TAG, "ready");
-	delay_ms(20);
+	vTaskDelay((TickType_t) 20 / portTICK_PERIOD_MS);
 }
 
 static inline void reset(void)
 {
-	ESP_ERROR_CHECK(gpio_set_level(EPD_RST_PIN, 1));
-	delay_ms(200);
+	gpio_set_level(EPD_RST_PIN, 1);
+	vTaskDelay((TickType_t) 200 / portTICK_PERIOD_MS);
 
-	ESP_ERROR_CHECK(gpio_set_level(EPD_RST_PIN, 0));
-	delay_ms(2);
+	gpio_set_level(EPD_RST_PIN, 0);
+	vTaskDelay((TickType_t) 2 / portTICK_PERIOD_MS);
 
-	ESP_ERROR_CHECK(gpio_set_level(EPD_RST_PIN, 1));
-	delay_ms(200);
+	gpio_set_level(EPD_RST_PIN, 1);
+	vTaskDelay((TickType_t) 200 / portTICK_PERIOD_MS);
 }
 
 static inline void config_lut(uint8_t cmd, const uint8_t *lut)
 {
-	uint8_t i;
-
 	send_cmd(cmd);
-	for(i = 0; i < 42; i++)
+
+	for (int i = 0; i < 42; i++)
 		send_data(lut[i]);
 }
 
@@ -155,11 +156,12 @@ static inline void gpio_init(void)
 	};
 
 	ESP_ERROR_CHECK(gpio_config(&io_cfg));
+
 	ESP_ERROR_CHECK(gpio_set_direction(EPD_DC_PIN, GPIO_MODE_OUTPUT));
 	ESP_ERROR_CHECK(gpio_set_direction(EPD_RST_PIN, GPIO_MODE_OUTPUT));
 	ESP_ERROR_CHECK(gpio_set_direction(EPD_BUSY_PIN, GPIO_MODE_INPUT));
 
-	delay_ms(500);
+	vTaskDelay((TickType_t) 1000 / portTICK_PERIOD_MS);
 }
 
 static void spi_init(void)
@@ -170,25 +172,23 @@ static void spi_init(void)
 		.sclk_io_num = EPD_CLK_PIN,
 		.quadwp_io_num = -1,
 		.quadhd_io_num = -1,
-		.max_transfer_sz = 8
+		.max_transfer_sz = EPD_WIDTH * EPD_HEIGHT
 	};
 
-	ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST,
-	                                   &bus_cfg,
-	                                   SPI_DMA_CH_AUTO));
+	ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST, &bus_cfg, SPI_DMA_CH_AUTO));
 
 	spi_device_interface_config_t dev_cfg = {
 		.clock_speed_hz = 10 * 1000 * 1000,
 		.mode = 0,
 		.spics_io_num = EPD_CS_PIN,
-		.queue_size = 1,
+		.queue_size = 3,
 		.pre_cb = spi_pre_cb_handler
 	};
 
 	ESP_ERROR_CHECK(spi_bus_add_device(SPI2_HOST, &dev_cfg, &spi));
 }
 
-void epd_init(void)
+void epd_init()
 {
 	spi_init();
 	gpio_init();
@@ -216,7 +216,7 @@ void epd_init(void)
 	send_data(*(VOLTAGE_FRAME + 0));
 
 	send_cmd(0x04);
-	delay_ms(100);
+	vTaskDelay((TickType_t) 100 / portTICK_PERIOD_MS);
 	wait_until_idle();	
 
 	send_cmd(0x00);
@@ -254,55 +254,66 @@ void epd_init(void)
 static inline void refresh()
 {
 	send_cmd(0x12);
-	delay_ms(100);
-
+	vTaskDelay((TickType_t) 100 / portTICK_PERIOD_MS);
 	wait_until_idle();
 }
 
 void epd_clear(void)
 {
-	uint16_t i, width, height;
-
-	width = (EPD_SCREEN_WIDTH % 8 == 0) ?
-	        (EPD_SCREEN_WIDTH / 8 ) :
-	        (EPD_SCREEN_WIDTH / 8 + 1);
-	height = EPD_SCREEN_HEIGHT;
+	int height = EPD_HEIGHT;
+	int width = (EPD_WIDTH % 8 == 0) ? (EPD_WIDTH / 8 ) : (EPD_WIDTH / 8 + 1);
 
 	send_cmd(0x10);
-	for(i = 0; i < height * width; i++)
+	for(int i = 0; i < height * width; i++)
 		send_data(0x00);
 
 	send_cmd(0x13);
-	for(i = 0; i < height * width; i++)
+	for(int i = 0; i < height * width; i++)
 		send_data(0x00);
 
 	refresh();
 }
 
-void epd_draw(const uint8_t pb[48000])
+void epd_draw_async(const uint8_t *buf, size_t n)
 {
-	uint32_t i, j, width, height;
+	static spi_transaction_t t[3];
 
-	width = (EPD_SCREEN_WIDTH % 8 == 0) ?
-	        (EPD_SCREEN_WIDTH / 8 ) :
-	        (EPD_SCREEN_WIDTH / 8 + 1);
-	height = EPD_SCREEN_HEIGHT;
-	
-	send_cmd(0x13);
-	for (i = 0; i < height; i++) {
-		for (j = 0; j < width; j++)
-			send_data(~pb[i * width + j]);
+	memset(&t[0], 0, sizeof(t[0]));	
+	t[0].length = 8;
+	t[0].tx_data[0] = 0x13;
+	t[0].user = (void*) 0; 
+	t[0].flags = SPI_TRANS_USE_TXDATA;
+
+	memset(&t[1], 0, sizeof(t[1]));	
+	t[1].length = 8 * n;
+	t[1].tx_buffer = buf;
+	t[1].user = (void*) 1; 
+
+	memset(&t[2], 0, sizeof(t[2]));	
+	t[2].length = 8;
+	t[2].tx_data[0] = 0x12;
+	t[2].user = (void*) 0; 
+	t[2].flags = SPI_TRANS_USE_TXDATA;
+
+	for (int i = 0; i < 3; i++)
+		spi_device_queue_trans(spi, &t[i], portMAX_DELAY);
+}
+
+void epd_draw_await(void)
+{
+	esp_err_t rc;
+	spi_transaction_t *t;
+
+	for (int i = 0; i < 3; i++) {
+		rc = spi_device_get_trans_result(spi, &t, portMAX_DELAY);
+		assert(rc == ESP_OK);
 	}
-
-	refresh();
 }
 
 void epd_sleep(void)
 {
 	send_cmd(0x02);
-
 	wait_until_idle();
-
 	send_cmd(0x07);
 	send_data(0xA5);
 }
