@@ -43,12 +43,12 @@ for p in paths:
             capture_output=True,
             text=True
          )
-    area = [int(x) for x in rv.stdout.split()]
-    if w * h < area[0] * area[1]:
-        w = area[0]
-        h = area[1]
-        dx = area[2]
-        dy = area[3]
+    info = [int(x) for x in rv.stdout.split()]
+    if w * h < info[0] * info[1]:
+        w = info[0]
+        h = info[1]
+        dx = info[2]
+        dy = info[3]
 
 crop = "{}x{}+{}+{}".format(w, h, dx, dy)
 print("Crop: {}".format(crop))
